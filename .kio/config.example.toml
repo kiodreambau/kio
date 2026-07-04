@@ -1,0 +1,36 @@
+# Example local kio configuration.
+# Copy to .kio/config.toml for repo-local development or ~/.kio/config.toml
+# for your Mac-wide worker config.
+
+bot_login = "kiodreambau"
+backend = "gito"
+workspace = "~/kio"
+poll_interval_seconds = 60
+default_agents = 2
+max_agents = 5
+allow_thermonuclear = false
+repos = ["kiodreambau/sandbox"]
+dashboard_host = "127.0.0.1"
+dashboard_port = 8765
+launch_agent_label = "io.kio.worker"
+launch_agent_runner = "uv"
+# webhook_secret = "replace-with-a-long-random-secret"
+webhook_dry_run = false
+rules_files = ["AGENTS.md"]
+token_budget = 250000
+# cost_budget_usd = 10.0
+
+# Leave this empty to run the checked-out source as: python -m gito review ...
+gito_command = ""
+
+[backend_commands]
+# Non-gito backends run a local shell command in the checked-out PR worktree.
+# Available placeholders:
+# {repo}, {pr}, {mode}, {mode_prompt}, {run_dir}, {checkout_dir}, {diff_file},
+# {base_ref}, {head_ref}, {head_sha}, {rules_file}, {default_agents},
+# {max_agents}, {token_budget}, {cost_budget_usd}
+#
+# codex = "your-codex-command > {run_dir}/agent-output.md"
+# claude-code = "your-claude-command > {run_dir}/agent-output.md"
+# opencode = "your-opencode-command > {run_dir}/agent-output.md"
+# local = "your-local-model-command > {run_dir}/agent-output.md"
