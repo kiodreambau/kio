@@ -46,9 +46,9 @@ gito_command = ""
 # {repo}, {pr}, {mode}, {mode_prompt}, {run_dir}, {checkout_dir}, {diff_file},
 # {base_ref}, {head_ref}, {head_sha}, {rules_file}, {default_agents},
 # {max_agents}, {token_budget}, {cost_budget_usd}, {review_level}, {profile},
-# {profile_title}, {profile_instructions}, {profile_file}
+# {profile_title}, {profile_instructions}, {profile_file}, {output_file}
 #
-# codex = "your-codex-command > {run_dir}/agent-output.md"
-# claude-code = "your-claude-command > {run_dir}/agent-output.md"
-# opencode = "your-opencode-command > {run_dir}/agent-output.md"
-# local = "your-local-model-command > {run_dir}/agent-output.md"
+# codex = "your-codex-command > {output_file}"
+# claude-code = "your-claude-command > {output_file}"
+# opencode = "your-opencode-command > {output_file}"
+# local = "your-local-model-command > {output_file}"

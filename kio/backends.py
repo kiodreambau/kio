@@ -160,6 +160,7 @@ def _run_external_agent(
             profile_title=profile.title,
             profile_instructions=profile.instructions,
             profile_file=profile_file,
+            output_file=output_file,
             run_dir=run_dir,
             checkout_dir=checkout_dir,
             diff_file=diff_file,
