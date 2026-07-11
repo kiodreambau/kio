@@ -38,7 +38,7 @@ def test_issue_comment_webhook_builds_work_item():
         "issue": {"number": 5, "pull_request": {"url": "https://api.github.com/pr"}},
         "comment": {
             "id": 99,
-            "body": "@kiodreambau review stability",
+            "body": "@kiocheck review 4",
             "user": {"login": "dev"},
         },
     }
@@ -53,7 +53,7 @@ def test_issue_comment_webhook_builds_work_item():
     assert item is not None
     assert item.pull_request.repo_full_name == "owner/repo"
     assert item.pull_request.number == 5
-    assert item.mode == "stability"
+    assert item.mode == "level-4"
     assert item.comment_id == 99
 
 
@@ -80,7 +80,7 @@ def test_pull_request_review_requested_webhook_builds_work_item():
 
     assert item is not None
     assert item.pull_request.head_sha == "def456"
-    assert item.mode == "standard"
+    assert item.mode == "level-1"
     assert item.source == "reviewer_request"
 
 

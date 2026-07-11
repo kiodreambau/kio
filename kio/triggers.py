@@ -22,15 +22,16 @@ def parse_review_comment(
     text: str | None,
     *,
     bot_login: str,
+    trigger_handle: str | None = None,
     allow_thermonuclear: bool = False,
     comment_id: int | None = None,
     author: str | None = None,
 ) -> ReviewTrigger | None:
-    """Return a review trigger for comments like '@kiodreambau review stability'."""
+    """Return a review trigger for comments like '@kiocheck review 4'."""
     if not text:
         return None
-    login = re.escape(bot_login.lstrip("@"))
-    pattern = re.compile(rf"(?i)(?:^|[\s>])@{login}\s+review(?:\s+([a-z0-9_-]+))?\b")
+    handle = re.escape((trigger_handle or bot_login).lstrip("@"))
+    pattern = re.compile(rf"(?i)(?:^|[\s>])@{handle}\s+review(?:\s+(?:level\s*)?([a-z0-9_-]+))?\b")
     match = pattern.search(text)
     if not match:
         return None

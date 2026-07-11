@@ -70,6 +70,7 @@ def create_app(config: KioConfig | None = None):
 def public_config(config: KioConfig) -> dict[str, Any]:
     return {
         "bot_login": config.bot_login,
+        "trigger_handle": config.trigger_handle,
         "backend": config.backend,
         "workspace": str(config.workspace.expanduser()),
         "runs_dir": str(config.runs_dir),
@@ -85,6 +86,10 @@ def public_config(config: KioConfig) -> dict[str, Any]:
         "rules_files": list(config.rules_files),
         "token_budget": config.token_budget,
         "cost_budget_usd": config.cost_budget_usd,
+        "review_levels": {
+            level: list(profiles) for level, profiles in config.review_levels.items()
+        },
+        "review_template_names": sorted(config.review_templates),
         "github_token_configured": bool(config.github_token),
     }
 
@@ -115,7 +120,7 @@ def render_dashboard(config: KioConfig, runs: list[RunSummary]) -> str:
       <header class="topbar">
         <div>
           <h1>kio</h1>
-          <p>{escape(repo_text)}</p>
+          <p>{escape(repo_text)} · trigger @{escape(cfg["trigger_handle"])} review 1–4</p>
         </div>
         <div class="toolbar" role="toolbar" aria-label="Dashboard actions">
           <button class="tool-button" title="Refresh" onclick="location.reload()" aria-label="Refresh">↻</button>

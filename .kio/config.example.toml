@@ -3,6 +3,8 @@
 # for your Mac-wide worker config.
 
 bot_login = "kiodreambau"
+# This is the PR-comment command. It does not need to be a GitHub account.
+trigger_handle = "kiocheck"
 backend = "gito"
 workspace = "~/kio"
 poll_interval_seconds = 60
@@ -20,6 +22,21 @@ rules_files = ["AGENTS.md"]
 token_budget = 250000
 # cost_budget_usd = 10.0
 
+# @kiocheck review       -> Level 1 (basic)
+# @kiocheck review 4     -> four independent passes before one combined PR report
+# `thermonuclear` remains a separately gated local mode and is not part of Level 4.
+[review_levels]
+"1" = ["basic"]
+"2" = ["basic", "test-density"]
+"3" = ["basic", "test-density", "stability"]
+"4" = ["correctness", "test-density", "stability", "performance"]
+
+# Override a built-in template or add project-specific profiles here. Template text,
+# the checked-out project rules, and the diff are supplied to every selected pass.
+[review_templates]
+# stability = "Use our project retry and data-migration rules. Report only concrete regressions."
+# accessibility = "For UI changes, check keyboard flow, labels, focus order, and contrast."
+
 # Leave this empty to run the checked-out source as: python -m gito review ...
 gito_command = ""
 
@@ -28,7 +45,8 @@ gito_command = ""
 # Available placeholders:
 # {repo}, {pr}, {mode}, {mode_prompt}, {run_dir}, {checkout_dir}, {diff_file},
 # {base_ref}, {head_ref}, {head_sha}, {rules_file}, {default_agents},
-# {max_agents}, {token_budget}, {cost_budget_usd}
+# {max_agents}, {token_budget}, {cost_budget_usd}, {review_level}, {profile},
+# {profile_title}, {profile_instructions}, {profile_file}
 #
 # codex = "your-codex-command > {run_dir}/agent-output.md"
 # claude-code = "your-claude-command > {run_dir}/agent-output.md"

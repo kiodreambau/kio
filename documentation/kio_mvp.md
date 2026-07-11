@@ -5,20 +5,26 @@ GitHub is the developer interface. The actual review runs on the owner's Mac.
 
 ## MVP boundary
 
-- Trigger reviews when `@kiodreambau review` appears in a PR comment.
-- Trigger standard reviews when `kiodreambau` is requested as reviewer.
-- Support explicit review modes: `standard`, `stability`, `tests`, `frontend`,
-  `security`, and `thermonuclear`.
+- Trigger reviews when `@kiocheck review [1-4]` appears in a PR comment.
+- Trigger Level 1 when `kiodreambau` is requested as reviewer.
+- Review Levels: Level 1 runs a basic high-confidence review; Levels 2 and 3 add
+  test density and stability; Level 4 runs four independent passes for
+  correctness/accessibility, test density/tooling, stability, and performance.
+- Keep legacy focused modes (`tests`, `stability`, `frontend`, `security`) for
+  manual or explicit comment use. `thermonuclear` is explicitly local-gated.
 - Keep `thermonuclear` disabled unless local config explicitly enables it.
 - Dedupe by `repo + PR + head_sha + mode`.
 - Store every run under `~/kio/runs/<repo>/pr-<number>/<head-sha>/<mode>/`.
-- Use Gito as the default backend.
+- Use Gito as the default backend. Each selected pass gets the checked-out diff,
+  project `.gito/config.toml`, bundled rule files, and its own review template.
 - Allow `codex`, `claude-code`, `opencode`, and `local` as command-template
   backends controlled only by local config.
 - Bundle owner/project review rules from `AGENTS.md` and configured rule files
   into each local run.
 - Pass agent limits and token/cost budgets to backend processes.
-- Post results back to GitHub as comments.
+- Post one transparent, combined PR review containing scope, reviewed commit,
+  selected passes, project-rule status, findings, evidence, impact, and causal
+  explanation. This deliberately does not expose hidden model reasoning.
 
 ## First sandbox loop
 

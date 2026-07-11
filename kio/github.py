@@ -22,6 +22,7 @@ class GithubClient:
         repos: Iterable[str],
         *,
         bot_login: str,
+        trigger_handle: str,
         allow_thermonuclear: bool,
     ) -> Iterator[WorkItem]:
         for repo_full_name in repos:
@@ -45,6 +46,7 @@ class GithubClient:
                         trigger = parse_review_comment(
                             _get(comment, "body", ""),
                             bot_login=bot_login,
+                            trigger_handle=trigger_handle,
                             allow_thermonuclear=allow_thermonuclear,
                             comment_id=_get(comment, "id"),
                             author=_get(_get(comment, "user", {}), "login"),

@@ -56,6 +56,7 @@ def _issue_comment_work_item(
     trigger = parse_review_comment(
         comment.get("body", ""),
         bot_login=config.bot_login,
+        trigger_handle=config.trigger_handle,
         allow_thermonuclear=config.allow_thermonuclear,
         comment_id=comment.get("id"),
         author=(comment.get("user") or {}).get("login"),

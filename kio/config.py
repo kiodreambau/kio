@@ -6,12 +6,15 @@ from pathlib import Path
 import tomllib
 from typing import Any
 
+from .review_modes import DEFAULT_LEVEL_PROFILES, DEFAULT_PROFILE_TEMPLATES, resolve_review_profiles
+
 SUPPORTED_BACKENDS = {"gito", "codex", "claude-code", "opencode", "local"}
 
 
 @dataclass(frozen=True)
 class KioConfig:
     bot_login: str = "kiodreambau"
+    trigger_handle: str = "kiocheck"
     backend: str = "gito"
     workspace: Path = Path("~/kio")
     poll_interval_seconds: int = 60
@@ -31,6 +34,12 @@ class KioConfig:
     rules_files: tuple[str, ...] = ("AGENTS.md",)
     token_budget: int | None = None
     cost_budget_usd: float | None = None
+    review_levels: dict[str, tuple[str, ...]] = field(
+        default_factory=lambda: dict(DEFAULT_LEVEL_PROFILES)
+    )
+    review_templates: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_PROFILE_TEMPLATES)
+    )
 
     @property
     def runs_dir(self) -> Path:
@@ -52,6 +61,20 @@ class KioConfig:
             raise ValueError("KIO_DEFAULT_AGENTS must be at least 1.")
         if self.max_agents < self.default_agents:
             raise ValueError("KIO_MAX_AGENTS must be greater than or equal to KIO_DEFAULT_AGENTS.")
+        for level, profiles in self.review_levels.items():
+            if str(level) not in {"1", "2", "3", "4"}:
+                raise ValueError("review_levels may only define levels 1 through 4.")
+            if not profiles:
+                raise ValueError(f"review level {level} must contain at least one profile.")
+            if len(profiles) > self.max_agents:
+                raise ValueError(
+                    f"review level {level} has {len(profiles)} passes, above max_agents={self.max_agents}."
+                )
+            resolve_review_profiles(
+                f"level-{level}",
+                level_profiles=self.review_levels,
+                profile_templates=self.review_templates,
+            )
 
 
 def load_config(config_file: Path | None = None) -> KioConfig:
@@ -64,6 +87,7 @@ def load_config(config_file: Path | None = None) -> KioConfig:
 
     cfg = KioConfig(
         bot_login=str(data.get("bot_login", KioConfig.bot_login)),
+        trigger_handle=str(data.get("trigger_handle", KioConfig.trigger_handle)),
         backend=str(data.get("backend", KioConfig.backend)),
         workspace=Path(str(data.get("workspace", KioConfig.workspace))),
         poll_interval_seconds=int(
@@ -85,6 +109,8 @@ def load_config(config_file: Path | None = None) -> KioConfig:
         rules_files=tuple(data.get("rules_files", KioConfig.rules_files)),
         token_budget=_optional_int(data.get("token_budget")),
         cost_budget_usd=_optional_float(data.get("cost_budget_usd")),
+        review_levels=_review_levels(data.get("review_levels")),
+        review_templates=_review_templates(data.get("review_templates")),
     )
     cfg.validate()
     return cfg
@@ -119,6 +145,7 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
     out = dict(data)
     env_map = {
         "KIO_BOT_LOGIN": "bot_login",
+        "KIO_TRIGGER_HANDLE": "trigger_handle",
         "KIO_BACKEND": "backend",
         "KIO_WORKSPACE": "workspace",
         "KIO_POLL_INTERVAL_SECONDS": "poll_interval_seconds",
@@ -167,6 +194,29 @@ def _coerce_env_value(key: str, value: str) -> Any:
     if key in {"allow_thermonuclear", "webhook_dry_run"}:
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return value
+
+
+def _review_levels(value: Any) -> dict[str, tuple[str, ...]]:
+    levels = dict(DEFAULT_LEVEL_PROFILES)
+    if not value:
+        return levels
+    if not isinstance(value, dict):
+        raise ValueError("review_levels must be a TOML table of level to profile names.")
+    for raw_level, raw_profiles in value.items():
+        if not isinstance(raw_profiles, list):
+            raise ValueError(f"review_levels.{raw_level} must be an array of template names.")
+        levels[str(raw_level)] = tuple(str(profile) for profile in raw_profiles)
+    return levels
+
+
+def _review_templates(value: Any) -> dict[str, str]:
+    templates = dict(DEFAULT_PROFILE_TEMPLATES)
+    if not value:
+        return templates
+    if not isinstance(value, dict):
+        raise ValueError("review_templates must be a TOML table of template text.")
+    templates.update({str(name): str(text) for name, text in value.items()})
+    return templates
 
 
 def _optional_int(value: Any) -> int | None:

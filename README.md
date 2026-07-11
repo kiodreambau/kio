@@ -3,8 +3,8 @@
 This fork keeps Gito as the review engine and adds `kio`, a local PR review
 orchestrator for the `kiodreambau` GitHub account. The first MVP target is a
 Mac-local worker that reacts to GitHub reviewer requests or comments such as
-`@kiodreambau review stability`, runs the configured backend locally, stores the
-run under `~/kio/runs`, and posts the result back to the PR.
+`@kiocheck review 4`, runs the configured backend locally, stores the run under
+`~/kio/runs`, and posts a transparent multi-pass report back to the PR.
 
 The upstream `gito` CLI is intentionally kept intact for now. New local-worker
 behavior lives in the `kio` package and is documented in

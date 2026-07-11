@@ -75,6 +75,7 @@ jira = "^3.10.5"
 pydantic = "^2.12.5"
 fastapi = ">=0.139.0,<1"
 uvicorn = ">=0.50.0,<1"
+tomlkit = ">=0.15.0,<1"
 # fastcore dependency is fixed becasue 1.12+ does not work in python 3.11, used by ghapi
 # https://github.com/AnswerDotAI/fastcore/pull/752
 fastcore= "~=1.11.3"

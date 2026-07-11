@@ -33,6 +33,7 @@ class KioWorker:
         for item in self._github().iter_work_items(
             target_repos,
             bot_login=self.config.bot_login,
+            trigger_handle=self.config.trigger_handle,
             allow_thermonuclear=self.config.allow_thermonuclear,
         ):
             if self.process_item(item, dry_run=dry_run):
