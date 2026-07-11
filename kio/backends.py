@@ -231,7 +231,8 @@ def _run_shell_command(
         shell=True,
         check=False,
     )
-    output_file.write_text(completed.stdout, encoding="utf-8")
+    if completed.stdout or not output_file.exists():
+        output_file.write_text(completed.stdout, encoding="utf-8")
     if completed.returncode != 0:
         raise BackendError(f"Command failed with exit code {completed.returncode}: {command}")
 
