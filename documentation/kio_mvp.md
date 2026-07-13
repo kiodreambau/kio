@@ -94,7 +94,8 @@ No auto-pushes and no auto-fixes are in scope for the MVP.
 ## Notification setup
 
 Set non-secret routing values in KIO config and service-only values in the
-environment:
+environment. KIO deliberately ignores SMTP usernames, SMTP passwords, and
+Slack webhook URLs in TOML, even if somebody adds them accidentally:
 
 ```toml
 notification_email_to = ["review@dreambau.com"]

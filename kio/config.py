@@ -159,9 +159,11 @@ def load_config(config_file: Path | None = None) -> KioConfig:
         smtp_host=str(data.get("smtp_host", "")),
         smtp_port=int(data.get("smtp_port", KioConfig.smtp_port)),
         smtp_security=str(data.get("smtp_security", KioConfig.smtp_security)),
-        smtp_username=str(data.get("smtp_username", "")),
-        smtp_password=str(data.get("smtp_password", "")),
-        slack_webhook_url=str(data.get("slack_webhook_url", "")),
+        # Credentials and webhook URLs are runtime-only. Deliberately do not
+        # read these from TOML, even when a file contains them by mistake.
+        smtp_username=os.getenv("KIO_SMTP_USERNAME", ""),
+        smtp_password=os.getenv("KIO_SMTP_PASSWORD", ""),
+        slack_webhook_url=os.getenv("KIO_SLACK_WEBHOOK_URL", ""),
     )
     cfg.validate()
     return cfg
@@ -220,9 +222,6 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "KIO_SMTP_HOST": "smtp_host",
         "KIO_SMTP_PORT": "smtp_port",
         "KIO_SMTP_SECURITY": "smtp_security",
-        "KIO_SMTP_USERNAME": "smtp_username",
-        "KIO_SMTP_PASSWORD": "smtp_password",
-        "KIO_SLACK_WEBHOOK_URL": "slack_webhook_url",
         "GITHUB_TOKEN": "github_token",
         "GH_TOKEN": "github_token",
     }

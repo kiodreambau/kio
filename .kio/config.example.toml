@@ -48,7 +48,7 @@ notification_email_template_file = ".kio/notification-email.md"
 codex_handoff_template_file = ".kio/codex-handoff.md"
 
 # Configure email delivery with non-secret routing values here or in the runtime environment.
-# Keep SMTP passwords and Slack URLs only in the service environment, never in TOML or Git.
+# KIO ignores SMTP usernames, SMTP passwords, and Slack URLs in TOML. They are runtime-only.
 # notification_email_to = ["review@dreambau.com"]
 # notification_email_from = "kiocheck@dreambau.com"
 # smtp_host = "mail.dreambau.com"
