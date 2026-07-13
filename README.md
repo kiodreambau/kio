@@ -1,3 +1,17 @@
+## kio fork direction
+
+This fork keeps Gito as the review engine and adds `kio`, a local PR review
+orchestrator for the `kiodreambau` GitHub account. The first MVP target is a
+Mac-local worker that reacts only when `kiodreambau` is requested as a GitHub
+reviewer. The PR label `kio:1` through `kio:4` selects review depth before the
+reviewer request. KIO runs the configured backend locally, stores the run under
+`~/kio/runs`, submits one transparent native GitHub review, and can send an
+outbound completion email or Slack notification.
+
+The upstream `gito` CLI is intentionally kept intact for now. New local-worker
+behavior lives in the `kio` package and is documented in
+[`documentation/kio_mvp.md`](documentation/kio_mvp.md).
+
 <h1 align="center"><a href="#"><img alt="Gito: AI Code Reviewer" src="https://raw.githubusercontent.com/Nayjest/Gito/main/press-kit/logo/gito-ai-code-reviewer_logo-180.png" align="center" width="180"></a></h1>
 <p align="center">
 <a href="https://pypi.org/project/gito.bot/" target="_blank"><img src="https://img.shields.io/pypi/v/gito.bot" alt="PYPI Release"></a>

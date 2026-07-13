@@ -57,7 +57,8 @@ maintainers = [
     "Dariia Stepanenko <zozulinadarina97@gmail.com>"
 ]
 packages = [
-    { include = "gito" }
+    { include = "gito" },
+    { include = "kio" }
 ]
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/Nayjest/Gito/issues"
@@ -72,6 +73,9 @@ typer = ">=0.16.0,<0.26"
 ghapi = "~=1.0.8"
 jira = "^3.10.5"
 pydantic = "^2.12.5"
+fastapi = ">=0.139.0,<1"
+uvicorn = ">=0.50.0,<1"
+tomlkit = ">=0.15.0,<1"
 # fastcore dependency is fixed becasue 1.12+ does not work in python 3.11, used by ghapi
 # https://github.com/AnswerDotAI/fastcore/pull/752
 fastcore= "~=1.11.3"
@@ -99,6 +103,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 gito = "gito.entrypoint:main"
 "gito.bot" = "gito.entrypoint:main"  # alias for `uvx gito.bot`
+kio = "kio.entrypoint:main"
+"kio-worker" = "kio.entrypoint:main"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
