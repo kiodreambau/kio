@@ -28,6 +28,11 @@ The Level 4 review runs correctness, test density, stability, and performance in
 Accessibility remains within correctness because it is only meaningful when the changed diff
 contains a relevant user interface path.
 
+Every pass must separate an evidenced finding from a check that was not possible in the
+available environment. KIO writes `Not verified:` with the missing evidence instead of
+claiming that tests, browser flows, profiling, or production behavior were checked. This
+keeps the GitHub review discussable without exposing private model reasoning.
+
 ## Deliberate constraints
 
 - Do not expose hidden model reasoning. A finding must instead show evidence, impact, and a

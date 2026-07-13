@@ -43,31 +43,36 @@ DEFAULT_PROFILE_TEMPLATES: dict[str, str] = {
         "contract. Report only concrete defects or regressions introduced by this diff, with file "
         "and line evidence. Do not block for style preferences, speculative refactors, or pre-existing "
         "issues. Prioritize findings that would materially reduce code health, and say explicitly when "
-        "no high-confidence issue is found."
+        "no high-confidence issue is found. Do not claim that code paths, tests, or runtime behavior "
+        "were verified unless the supplied evidence proves it; label relevant unchecked areas as Not verified."
     ),
     "correctness": (
         "Review correctness and changed user-visible behavior. Trace control flow, data flow, "
         "error handling, and backward compatibility. If the diff affects UI, also assess keyboard "
         "use, semantic structure, labels, focus handling, responsive layout, and other accessibility "
         "regressions. For each issue, identify the changed path that makes the behavior fail; do not "
-        "raise generic accessibility advice when no relevant UI changed."
+        "raise generic accessibility advice when no relevant UI changed. If an interaction or layout "
+        "cannot be exercised from the available evidence, label it Not verified rather than guessing."
     ),
     "test-density": (
         "Review test density and verification. Identify changed behavior without a focused test, "
         "weak assertions, missing edge cases, and mismatches with lint, type-check, or test tooling. "
         "Check whether a test would fail if the production behavior regressed. Do not demand tests "
-        "where the changed behavior is already covered with strong evidence or where a test adds no value."
+        "where the changed behavior is already covered with strong evidence or where a test adds no value. "
+        "State which existing test or command provides the evidence; otherwise mark the coverage as Not verified."
     ),
     "stability": (
         "Review stability and operational safety. Focus on failure paths, retries, state transitions, "
         "concurrency, idempotency, data loss, migrations, compatibility, observability, and safe "
-        "degradation. Tie every finding to a plausible production failure path caused by this diff."
+        "degradation. Tie every finding to a plausible production failure path caused by this diff. "
+        "Distinguish an evidenced regression from an operational path that remains Not verified."
     ),
     "performance": (
         "Review performance and scalability. Focus on avoidable repeated work, unbounded queries or "
         "loops, excess network or disk I/O, memory growth, and latency regressions that the diff can cause. "
         "For user-facing changes also consider perceived responsiveness on narrow mobile viewports. Avoid "
-        "micro-optimizations without a concrete affected path."
+        "micro-optimizations without a concrete affected path. Do not invent measurements; mark performance "
+        "claims that need profiling or device testing as Not verified."
     ),
     "frontend": (
         "Review UI behavior, accessibility, responsive layout, keyboard interaction, and user-facing regressions."

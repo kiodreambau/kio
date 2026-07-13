@@ -17,6 +17,17 @@ def test_level_four_uses_four_independent_review_passes():
     ]
 
 
+def test_default_profiles_require_evidence_or_a_not_verified_marker():
+    profiles = {
+        profile.name: profile.instructions for profile in resolve_review_profiles("level-4")
+    }
+
+    assert "Not verified" in profiles["correctness"]
+    assert "Not verified" in profiles["test-density"]
+    assert "Not verified" in profiles["stability"]
+    assert "Not verified" in profiles["performance"]
+
+
 def test_local_templates_can_override_a_profile_and_level():
     config = KioConfig(
         review_levels={
