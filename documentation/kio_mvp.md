@@ -113,4 +113,5 @@ KIO_SLACK_WEBHOOK_URL=https://hooks.slack.com/...  # optional, never commit this
 
 Templates are versioned in `.kio/review-policy.md`, `.kio/notification-email.md`,
 and `.kio/codex-handoff.md`. Review profiles remain configurable in
-`[review_templates]`.
+`[review_templates]`. The source rationale and customization model are documented in
+[`kio_review_template_sources.md`](kio_review_template_sources.md).
