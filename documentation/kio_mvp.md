@@ -70,6 +70,9 @@ launchctl enable gui/$(id -u)/io.kio.worker
    subscribe to `Issue comments`. Set `webhook_secret` or `KIO_WEBHOOK_SECRET`
    to verify `X-Hub-Signature-256`.
 
+   Add every accepted repository to `repos` in KIO configuration. A signed
+   webhook for a repository outside this allowlist is ignored.
+
 10. Remove `--dry-run` after the trigger and run folder look correct.
 
 No auto-pushes and no auto-fixes are in scope for the MVP.

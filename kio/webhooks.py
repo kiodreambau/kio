@@ -43,6 +43,11 @@ def _pull_request_work_item(payload: dict[str, Any], *, config: KioConfig) -> Wo
     action = payload.get("action")
     if action != "review_requested":
         return None
+    repo_name = _repo_name(payload)
+    if not repo_name:
+        raise ValueError("Webhook payload is missing repository.full_name.")
+    if config.repos and repo_name not in config.repos:
+        return None
     pr_payload = payload.get("pull_request") or {}
     requested = payload.get("requested_reviewer")
     reviewers = [requested.get("login", "")] if isinstance(requested, dict) else []

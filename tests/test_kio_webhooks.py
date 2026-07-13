@@ -122,6 +122,28 @@ def test_reviewer_request_rejects_ambiguous_level_labels():
         webhook_work_item(payload, event="pull_request", config=KioConfig())
 
 
+def test_reviewer_request_ignores_a_repository_outside_the_allowlist():
+    payload = {
+        "action": "review_requested",
+        "requested_reviewer": {"login": "kiodreambau"},
+        "repository": {"full_name": "other/repo", "clone_url": "https://github.com/other/repo.git"},
+        "pull_request": {
+            "number": 7,
+            "head": {"sha": "def456", "ref": "feature"},
+            "base": {"ref": "main", "repo": {"clone_url": "https://github.com/other/repo.git"}},
+        },
+    }
+
+    assert (
+        webhook_work_item(
+            payload,
+            event="pull_request",
+            config=KioConfig(repos=("owner/repo",)),
+        )
+        is None
+    )
+
+
 def test_webhook_ignores_unrelated_comment():
     payload = {
         "action": "created",
