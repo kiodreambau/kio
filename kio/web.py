@@ -90,6 +90,11 @@ def public_config(config: KioConfig) -> dict[str, Any]:
             level: list(profiles) for level, profiles in config.review_levels.items()
         },
         "review_template_names": sorted(config.review_templates),
+        "review_level_labels": dict(config.review_level_labels),
+        "email_notifications_configured": bool(
+            config.notification_email_to and config.notification_email_from and config.smtp_host
+        ),
+        "slack_notifications_configured": bool(config.slack_webhook_url),
         "github_token_configured": bool(config.github_token),
     }
 
@@ -120,7 +125,7 @@ def render_dashboard(config: KioConfig, runs: list[RunSummary]) -> str:
       <header class="topbar">
         <div>
           <h1>kio</h1>
-          <p>{escape(repo_text)} · trigger @{escape(cfg["trigger_handle"])} review 1–4</p>
+          <p>{escape(repo_text)} · reviewer @{escape(cfg["bot_login"])} · label kio:1–4</p>
         </div>
         <div class="toolbar" role="toolbar" aria-label="Dashboard actions">
           <button class="tool-button" title="Refresh" onclick="location.reload()" aria-label="Refresh">↻</button>

@@ -3,7 +3,7 @@
 # for your Mac-wide worker config.
 
 bot_login = "kiodreambau"
-# This is the PR-comment command. It does not need to be a GitHub account.
+# kiocheck is the review-system name shown in reports. It is not a comment trigger.
 trigger_handle = "kiocheck"
 backend = "gito"
 workspace = "~/kio"
@@ -18,13 +18,19 @@ launch_agent_label = "io.kio.worker"
 launch_agent_runner = "uv"
 # webhook_secret = "replace-with-a-long-random-secret"
 webhook_dry_run = false
-rules_files = ["AGENTS.md"]
+rules_files = ["AGENTS.md", ".kio/review-policy.md"]
 token_budget = 250000
 # cost_budget_usd = 10.0
 
-# @kiocheck review       -> Level 1 (basic)
-# @kiocheck review 4     -> four independent passes before one combined PR report
-# `thermonuclear` remains a separately gated local mode and is not part of Level 4.
+# A developer applies one kio label before requesting @kiodreambau as reviewer.
+# No PR or issue comment can trigger KIO.
+[review_level_labels]
+"kio:1" = "level-1"
+"kio:2" = "level-2"
+"kio:3" = "level-3"
+"kio:4" = "level-4"
+
+# `thermonuclear` remains a separately gated local manual mode and is not part of Level 4.
 [review_levels]
 "1" = ["basic"]
 "2" = ["basic", "test-density"]
@@ -36,6 +42,20 @@ token_budget = 250000
 [review_templates]
 # stability = "Use our project retry and data-migration rules. Report only concrete regressions."
 # accessibility = "For UI changes, check keyboard flow, labels, focus order, and contrast."
+
+# Outbound notification templates. These paths are versioned in this repository.
+notification_email_template_file = ".kio/notification-email.md"
+codex_handoff_template_file = ".kio/codex-handoff.md"
+
+# Configure email delivery with non-secret routing values here or in the runtime environment.
+# Keep SMTP passwords and Slack URLs only in the service environment, never in TOML or Git.
+# notification_email_to = ["review@dreambau.com"]
+# notification_email_from = "kiocheck@dreambau.com"
+# smtp_host = "mail.dreambau.com"
+# smtp_port = 587
+# smtp_security = "starttls" # starttls, ssl, or none
+# KIO_SMTP_USERNAME and KIO_SMTP_PASSWORD are read from the environment.
+# KIO_SLACK_WEBHOOK_URL is optional and sends an outbound completion notification only.
 
 # Leave this empty to run the checked-out source as: python -m gito review ...
 gito_command = ""

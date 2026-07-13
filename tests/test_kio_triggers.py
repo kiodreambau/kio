@@ -50,6 +50,26 @@ def test_reviewer_request_defaults_to_level_one():
     assert trigger.source == "reviewer_request"
 
 
+def test_reviewer_request_uses_a_configured_level_label():
+    trigger = trigger_from_reviewer_request(
+        ["kiodreambau"],
+        bot_login="kiodreambau",
+        labels=["kio:3"],
+    )
+
+    assert trigger is not None
+    assert trigger.mode == "level-3"
+
+
+def test_reviewer_request_rejects_multiple_level_labels():
+    with pytest.raises(ReviewModeError, match="only one kio review-level label"):
+        trigger_from_reviewer_request(
+            ["kiodreambau"],
+            bot_login="kiodreambau",
+            labels=["kio:1", "kio:4"],
+        )
+
+
 def test_thermonuclear_requires_local_gate():
     with pytest.raises(ReviewModeError):
         normalize_review_mode("thermonuclear")

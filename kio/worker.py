@@ -2,7 +2,6 @@
 
 import json
 import logging
-from pathlib import Path
 import time
 
 from .config import KioConfig
@@ -33,8 +32,8 @@ class KioWorker:
         for item in self._github().iter_work_items(
             target_repos,
             bot_login=self.config.bot_login,
-            trigger_handle=self.config.trigger_handle,
             allow_thermonuclear=self.config.allow_thermonuclear,
+            review_level_labels=self.config.review_level_labels,
         ):
             if self.process_item(item, dry_run=dry_run):
                 reviewed += 1
@@ -87,6 +86,16 @@ class KioWorker:
         with (run_dir / "backend-result.json").open("w", encoding="utf-8") as fh:
             json.dump(result.to_json(), fh, indent=2, sort_keys=True)
             fh.write("\n")
+        from .notifications import notify_review_completed, write_codex_handoff
+
+        handoff_file = write_codex_handoff(item, config=self.config, run_dir=run_dir)
+        notify_review_completed(
+            item,
+            config=self.config,
+            run_dir=run_dir,
+            result=result,
+            handoff_file=handoff_file,
+        )
         self.state.mark_completed(
             item.dedupe_key,
             run_dir=run_dir,

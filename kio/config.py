@@ -6,7 +6,13 @@ from pathlib import Path
 import tomllib
 from typing import Any
 
-from .review_modes import DEFAULT_LEVEL_PROFILES, DEFAULT_PROFILE_TEMPLATES, resolve_review_profiles
+from .review_modes import (
+    DEFAULT_LEVEL_PROFILES,
+    DEFAULT_PROFILE_TEMPLATES,
+    DEFAULT_REVIEW_LEVEL_LABELS,
+    normalize_review_mode,
+    resolve_review_profiles,
+)
 
 SUPPORTED_BACKENDS = {"gito", "codex", "claude-code", "opencode", "local"}
 
@@ -40,6 +46,19 @@ class KioConfig:
     review_templates: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_PROFILE_TEMPLATES)
     )
+    review_level_labels: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_REVIEW_LEVEL_LABELS)
+    )
+    notification_email_to: tuple[str, ...] = ()
+    notification_email_from: str = ""
+    notification_email_template_file: Path = Path(".kio/notification-email.md")
+    codex_handoff_template_file: Path = Path(".kio/codex-handoff.md")
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_security: str = "starttls"
+    smtp_username: str = ""
+    smtp_password: str = ""
+    slack_webhook_url: str = ""
 
     @property
     def runs_dir(self) -> Path:
@@ -75,6 +94,18 @@ class KioConfig:
                 level_profiles=self.review_levels,
                 profile_templates=self.review_templates,
             )
+        for label, mode in self.review_level_labels.items():
+            if not label.strip():
+                raise ValueError("review_level_labels may not contain an empty label.")
+            if normalize_review_mode(mode, allow_thermonuclear=False) not in {
+                "level-1",
+                "level-2",
+                "level-3",
+                "level-4",
+            }:
+                raise ValueError("review_level_labels may only select levels 1 through 4.")
+        if self.smtp_security not in {"starttls", "ssl", "none"}:
+            raise ValueError("smtp_security must be starttls, ssl, or none.")
 
 
 def load_config(config_file: Path | None = None) -> KioConfig:
@@ -111,6 +142,26 @@ def load_config(config_file: Path | None = None) -> KioConfig:
         cost_budget_usd=_optional_float(data.get("cost_budget_usd")),
         review_levels=_review_levels(data.get("review_levels")),
         review_templates=_review_templates(data.get("review_templates")),
+        review_level_labels=_review_level_labels(data.get("review_level_labels")),
+        notification_email_to=tuple(data.get("notification_email_to", ())),
+        notification_email_from=str(data.get("notification_email_from", "")),
+        notification_email_template_file=Path(
+            str(
+                data.get(
+                    "notification_email_template_file",
+                    KioConfig.notification_email_template_file,
+                )
+            )
+        ),
+        codex_handoff_template_file=Path(
+            str(data.get("codex_handoff_template_file", KioConfig.codex_handoff_template_file))
+        ),
+        smtp_host=str(data.get("smtp_host", "")),
+        smtp_port=int(data.get("smtp_port", KioConfig.smtp_port)),
+        smtp_security=str(data.get("smtp_security", KioConfig.smtp_security)),
+        smtp_username=str(data.get("smtp_username", "")),
+        smtp_password=str(data.get("smtp_password", "")),
+        slack_webhook_url=str(data.get("slack_webhook_url", "")),
     )
     cfg.validate()
     return cfg
@@ -162,6 +213,16 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "KIO_RULES_FILES": "rules_files",
         "KIO_TOKEN_BUDGET": "token_budget",
         "KIO_COST_BUDGET_USD": "cost_budget_usd",
+        "KIO_NOTIFICATION_EMAIL_TO": "notification_email_to",
+        "KIO_NOTIFICATION_EMAIL_FROM": "notification_email_from",
+        "KIO_NOTIFICATION_EMAIL_TEMPLATE_FILE": "notification_email_template_file",
+        "KIO_CODEX_HANDOFF_TEMPLATE_FILE": "codex_handoff_template_file",
+        "KIO_SMTP_HOST": "smtp_host",
+        "KIO_SMTP_PORT": "smtp_port",
+        "KIO_SMTP_SECURITY": "smtp_security",
+        "KIO_SMTP_USERNAME": "smtp_username",
+        "KIO_SMTP_PASSWORD": "smtp_password",
+        "KIO_SLACK_WEBHOOK_URL": "slack_webhook_url",
         "GITHUB_TOKEN": "github_token",
         "GH_TOKEN": "github_token",
     }
@@ -183,9 +244,15 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _coerce_env_value(key: str, value: str) -> Any:
-    if key in {"poll_interval_seconds", "default_agents", "max_agents", "dashboard_port"}:
+    if key in {
+        "poll_interval_seconds",
+        "default_agents",
+        "max_agents",
+        "dashboard_port",
+        "smtp_port",
+    }:
         return int(value)
-    if key == "rules_files":
+    if key in {"rules_files", "notification_email_to"}:
         return tuple(item.strip() for item in value.split(",") if item.strip())
     if key == "token_budget":
         return _optional_int(value)
@@ -217,6 +284,16 @@ def _review_templates(value: Any) -> dict[str, str]:
         raise ValueError("review_templates must be a TOML table of template text.")
     templates.update({str(name): str(text) for name, text in value.items()})
     return templates
+
+
+def _review_level_labels(value: Any) -> dict[str, str]:
+    labels = dict(DEFAULT_REVIEW_LEVEL_LABELS)
+    if not value:
+        return labels
+    if not isinstance(value, dict):
+        raise ValueError("review_level_labels must map a PR label to a review level.")
+    labels.update({str(label): str(mode) for label, mode in value.items()})
+    return labels
 
 
 def _optional_int(value: Any) -> int | None:

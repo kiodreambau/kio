@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass
 import re
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Mapping
 
-from .review_modes import normalize_review_mode
+from .review_modes import normalize_review_mode, review_mode_from_labels
 
 TriggerSource = Literal["comment", "reviewer_request", "manual"]
 
@@ -52,13 +52,18 @@ def trigger_from_reviewer_request(
     requested_reviewers: Iterable[str],
     *,
     bot_login: str,
+    labels: Iterable[str] = (),
+    review_level_labels: Mapping[str, str] | None = None,
     allow_thermonuclear: bool = False,
 ) -> ReviewTrigger | None:
-    """Return the default review trigger if the kio account is requested as reviewer."""
+    """Return a label-scoped trigger when the kio account is requested as reviewer."""
+    labels = tuple(labels)
     normalized = {reviewer.lower().lstrip("@") for reviewer in requested_reviewers}
     if bot_login.lower().lstrip("@") not in normalized:
         return None
+    mode = review_mode_from_labels(labels, level_labels=review_level_labels)
     return ReviewTrigger(
         source="reviewer_request",
-        mode=normalize_review_mode(None, allow_thermonuclear=allow_thermonuclear),
+        mode=normalize_review_mode(mode, allow_thermonuclear=allow_thermonuclear),
+        raw_text="review request" + (f" ({', '.join(labels)})" if labels else ""),
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Mapping
+from typing import Iterable, Mapping
 
 DEFAULT_MODE = "level-1"
 THERMONUCLEAR_MODE = "thermonuclear"
@@ -28,28 +28,46 @@ DEFAULT_LEVEL_PROFILES: dict[str, tuple[str, ...]] = {
     "4": ("correctness", "test-density", "stability", "performance"),
 }
 
+# A reviewer request is the only GitHub trigger. The PR author selects the
+# depth before requesting the reviewer by applying exactly one of these labels.
+DEFAULT_REVIEW_LEVEL_LABELS: dict[str, str] = {
+    "kio:1": "level-1",
+    "kio:2": "level-2",
+    "kio:3": "level-3",
+    "kio:4": "level-4",
+}
+
 DEFAULT_PROFILE_TEMPLATES: dict[str, str] = {
     "basic": (
-        "Perform a concise, high-confidence review of the changed behavior. "
-        "Report only concrete defects or regressions, with file and line evidence."
+        "Perform a concise, high-confidence review of the changed behavior and its surrounding "
+        "contract. Report only concrete defects or regressions introduced by this diff, with file "
+        "and line evidence. Do not block for style preferences, speculative refactors, or pre-existing "
+        "issues. Prioritize findings that would materially reduce code health, and say explicitly when "
+        "no high-confidence issue is found."
     ),
     "correctness": (
         "Review correctness and changed user-visible behavior. Trace control flow, data flow, "
         "error handling, and backward compatibility. If the diff affects UI, also assess keyboard "
-        "use, semantic structure, labels, focus handling, and other accessibility regressions."
+        "use, semantic structure, labels, focus handling, responsive layout, and other accessibility "
+        "regressions. For each issue, identify the changed path that makes the behavior fail; do not "
+        "raise generic accessibility advice when no relevant UI changed."
     ),
     "test-density": (
         "Review test density and verification. Identify changed behavior without a focused test, "
         "weak assertions, missing edge cases, and mismatches with lint, type-check, or test tooling. "
-        "Do not demand tests where the changed behavior is already covered with strong evidence."
+        "Check whether a test would fail if the production behavior regressed. Do not demand tests "
+        "where the changed behavior is already covered with strong evidence or where a test adds no value."
     ),
     "stability": (
         "Review stability and operational safety. Focus on failure paths, retries, state transitions, "
-        "concurrency, idempotency, data loss, migrations, and safe degradation."
+        "concurrency, idempotency, data loss, migrations, compatibility, observability, and safe "
+        "degradation. Tie every finding to a plausible production failure path caused by this diff."
     ),
     "performance": (
         "Review performance and scalability. Focus on avoidable repeated work, unbounded queries or "
-        "loops, excess network or disk I/O, memory growth, and latency regressions that the diff can cause."
+        "loops, excess network or disk I/O, memory growth, and latency regressions that the diff can cause. "
+        "For user-facing changes also consider perceived responsiveness on narrow mobile viewports. Avoid "
+        "micro-optimizations without a concrete affected path."
     ),
     "frontend": (
         "Review UI behavior, accessibility, responsive layout, keyboard interaction, and user-facing regressions."
@@ -59,7 +77,8 @@ DEFAULT_PROFILE_TEMPLATES: dict[str, str] = {
     ),
     "thermonuclear": (
         "Perform the deepest practical review across correctness, testing, stability, security, accessibility, "
-        "and performance. Keep every finding concrete and actionable."
+        "and performance. Treat it as a local-only, explicitly requested escalation. De-duplicate findings, "
+        "prioritize material risk, and keep every finding concrete, evidence-backed, and actionable."
     ),
 }
 
@@ -90,6 +109,30 @@ def review_level(mode: str) -> int | None:
     if match := re.fullmatch(r"level-([1-4])", mode):
         return int(match.group(1))
     return None
+
+
+def review_mode_from_labels(
+    labels: Iterable[str],
+    *,
+    level_labels: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve one configured review-level label, defaulting to Level 1."""
+    configured = {
+        label.strip().lower(): normalize_review_mode(mode)
+        for label, mode in (level_labels or DEFAULT_REVIEW_LEVEL_LABELS).items()
+        if label.strip()
+    }
+    selected = {
+        configured[label.strip().lower()] for label in labels if label.strip().lower() in configured
+    }
+    if not selected:
+        return DEFAULT_MODE
+    if len(selected) > 1:
+        names = ", ".join(sorted(selected))
+        raise ReviewModeError(
+            f"A pull request may have only one kio review-level label; found {names}."
+        )
+    return selected.pop()
 
 
 def resolve_review_profiles(

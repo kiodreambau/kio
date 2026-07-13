@@ -344,21 +344,24 @@ def _strip_report_markers(body: str) -> str:
 
 
 def _post_review_output(item: WorkItem, *, config: KioConfig, output_file: Path) -> None:
-    from gito.gh_api import post_gh_comment
+    from .github import post_pull_request_review
 
     if not config.github_token:
-        raise BackendError("Cannot post GitHub comment without GITHUB_TOKEN or GH_TOKEN.")
+        raise BackendError("Cannot submit a GitHub review without GITHUB_TOKEN or GH_TOKEN.")
     body = output_file.read_text(encoding="utf-8").strip()
     if not body:
         body = "## kiocheck review\n\nThe configured backend completed without text output."
-    for part in _split_comment(body):
-        if not post_gh_comment(
-            item.pull_request.repo_full_name,
-            item.pull_request.number,
-            config.github_token,
-            part,
-        ):
-            raise BackendError("Failed to post GitHub comment.")
+    if len(body) > 60_000:
+        body = (
+            body[:59_800].rstrip() + "\n\n---\nThe full report is retained in the kio run artifact."
+        )
+    if not post_pull_request_review(
+        item.pull_request.repo_full_name,
+        item.pull_request.number,
+        config.github_token,
+        body,
+    ):
+        raise BackendError("Failed to submit GitHub review.")
 
 
 def _split_comment(body: str, *, max_length: int = 60_000) -> list[str]:

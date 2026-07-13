@@ -10,7 +10,7 @@ from typing import Any
 from .config import KioConfig
 from .github import GithubClient
 from .models import PullRequestContext, WorkItem
-from .triggers import parse_review_comment, trigger_from_reviewer_request
+from .triggers import trigger_from_reviewer_request
 
 
 class SignatureError(ValueError):
@@ -34,67 +34,26 @@ def webhook_work_item(
     config: KioConfig,
     github: GithubClient | None = None,
 ) -> WorkItem | None:
-    if event == "issue_comment":
-        return _issue_comment_work_item(payload, config=config, github=github)
     if event == "pull_request":
         return _pull_request_work_item(payload, config=config)
     return None
 
 
-def _issue_comment_work_item(
-    payload: dict[str, Any],
-    *,
-    config: KioConfig,
-    github: GithubClient | None = None,
-) -> WorkItem | None:
-    if payload.get("action") != "created":
-        return None
-    issue = payload.get("issue") or {}
-    if "pull_request" not in issue:
-        return None
-    comment = payload.get("comment") or {}
-    trigger = parse_review_comment(
-        comment.get("body", ""),
-        bot_login=config.bot_login,
-        trigger_handle=config.trigger_handle,
-        allow_thermonuclear=config.allow_thermonuclear,
-        comment_id=comment.get("id"),
-        author=(comment.get("user") or {}).get("login"),
-    )
-    if not trigger:
-        return None
-    repo = _repo_name(payload)
-    if not repo:
-        raise ValueError("Webhook payload is missing repository.full_name.")
-    client = github or GithubClient(config.github_token)
-    pr = client.get_pull_request(repo, int(issue["number"]))
-    return WorkItem(
-        pull_request=pr,
-        source=trigger.source,
-        mode=trigger.mode,
-        comment_id=trigger.comment_id,
-        author=trigger.author,
-        raw_text=trigger.raw_text,
-    )
-
-
 def _pull_request_work_item(payload: dict[str, Any], *, config: KioConfig) -> WorkItem | None:
     action = payload.get("action")
-    if action not in {"review_requested", "opened", "reopened", "synchronize"}:
+    if action != "review_requested":
         return None
     pr_payload = payload.get("pull_request") or {}
-    if action == "review_requested":
-        requested = payload.get("requested_reviewer")
-        reviewers = [requested.get("login", "")] if isinstance(requested, dict) else []
-    else:
-        reviewers = [
-            user.get("login", "")
-            for user in pr_payload.get("requested_reviewers", [])
-            if isinstance(user, dict)
-        ]
+    requested = payload.get("requested_reviewer")
+    reviewers = [requested.get("login", "")] if isinstance(requested, dict) else []
+    labels = [
+        label.get("name", "") for label in pr_payload.get("labels", []) if isinstance(label, dict)
+    ]
     trigger = trigger_from_reviewer_request(
         reviewers,
         bot_login=config.bot_login,
+        labels=labels,
+        review_level_labels=config.review_level_labels,
         allow_thermonuclear=config.allow_thermonuclear,
     )
     if not trigger:
@@ -103,6 +62,7 @@ def _pull_request_work_item(payload: dict[str, Any], *, config: KioConfig) -> Wo
         pull_request=_pull_request_context(payload),
         source=trigger.source,
         mode=trigger.mode,
+        raw_text=trigger.raw_text,
     )
 
 

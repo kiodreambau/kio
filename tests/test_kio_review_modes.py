@@ -3,7 +3,7 @@ import pytest
 from kio.backends import _write_gito_profile_config, _write_review_comment
 from kio.config import KioConfig
 from kio.models import PullRequestContext, WorkItem
-from kio.review_modes import ReviewModeError, resolve_review_profiles
+from kio.review_modes import resolve_review_profiles
 
 
 def test_level_four_uses_four_independent_review_passes():
