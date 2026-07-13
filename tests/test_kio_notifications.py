@@ -105,7 +105,32 @@ def test_notification_records_incomplete_email_configuration_as_skipped(tmp_path
         {
             "channel": "email",
             "status": "skipped",
-            "detail": "missing notification_email_from, smtp_host",
+            "detail": "missing notification_email_from, smtp_host, smtp_username, smtp_password",
+        }
+    ]
+
+
+def test_notification_requires_runtime_smtp_credentials(tmp_path):
+    config = KioConfig(
+        notification_email_to=("owner@dreambau.com",),
+        notification_email_from="kiocheck@dreambau.com",
+        smtp_host="mail.dreambau.com",
+    )
+    handoff = write_codex_handoff(_item(), config=config, run_dir=tmp_path)
+
+    deliveries = notify_review_completed(
+        _item(),
+        config=config,
+        run_dir=tmp_path,
+        result=_result(tmp_path),
+        handoff_file=handoff,
+    )
+
+    assert deliveries == [
+        {
+            "channel": "email",
+            "status": "skipped",
+            "detail": "missing smtp_username, smtp_password",
         }
     ]
 

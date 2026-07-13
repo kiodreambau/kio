@@ -23,6 +23,17 @@ def test_public_config_does_not_expose_runtime_secrets(tmp_path):
     assert "slack_webhook_url" not in data
 
 
+def test_public_config_requires_smtp_credentials_for_email_status(tmp_path):
+    cfg = KioConfig(
+        workspace=tmp_path,
+        notification_email_to=("owner@dreambau.com",),
+        notification_email_from="kiocheck@dreambau.com",
+        smtp_host="mail.dreambau.com",
+    )
+
+    assert public_config(cfg)["email_notifications_configured"] is False
+
+
 def test_dashboard_renders_codex_like_controls(tmp_path):
     cfg = KioConfig(workspace=tmp_path, repos=("owner/repo",), backend="gito")
     html = render_dashboard(

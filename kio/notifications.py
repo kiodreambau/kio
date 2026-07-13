@@ -81,6 +81,8 @@ def _send_email(config: KioConfig, values: dict[str, str]) -> dict[str, str]:
         "notification_email_to": config.notification_email_to,
         "notification_email_from": config.notification_email_from,
         "smtp_host": config.smtp_host,
+        "smtp_username": config.smtp_username,
+        "smtp_password": config.smtp_password,
     }
     missing = [name for name, value in required.items() if not value]
     if missing:

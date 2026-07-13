@@ -92,7 +92,11 @@ def public_config(config: KioConfig) -> dict[str, Any]:
         "review_template_names": sorted(config.review_templates),
         "review_level_labels": dict(config.review_level_labels),
         "email_notifications_configured": bool(
-            config.notification_email_to and config.notification_email_from and config.smtp_host
+            config.notification_email_to
+            and config.notification_email_from
+            and config.smtp_host
+            and config.smtp_username
+            and config.smtp_password
         ),
         "slack_notifications_configured": bool(config.slack_webhook_url),
         "github_token_configured": bool(config.github_token),
