@@ -64,6 +64,11 @@ class KioConfig:
     slack_bot_user_id: str = ""
     slack_bug_channel: str = ""
     slack_bug_repo: str = ""
+    repair_worker_token: str = ""
+    repair_api_url: str = ""
+    repair_worker_id: str = "kio-mac-mini"
+    repair_repos: dict[str, str] = field(default_factory=dict)
+    repair_command: str = "codex"
 
     @property
     def runs_dir(self) -> Path:
@@ -186,6 +191,13 @@ def load_config(config_file: Path | None = None) -> KioConfig:
         slack_bot_user_id=str(data.get("slack_bot_user_id", "")),
         slack_bug_channel=str(data.get("slack_bug_channel", "")),
         slack_bug_repo=str(data.get("slack_bug_repo", "")),
+        repair_worker_token=os.getenv("KIO_REPAIR_WORKER_TOKEN", ""),
+        repair_api_url=str(data.get("repair_api_url", "")),
+        repair_worker_id=str(data.get("repair_worker_id", KioConfig.repair_worker_id)),
+        repair_repos={
+            str(repo): str(path) for repo, path in dict(data.get("repair_repos", {})).items()
+        },
+        repair_command=str(data.get("repair_command", KioConfig.repair_command)),
     )
     cfg.validate()
     return cfg

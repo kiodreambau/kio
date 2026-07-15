@@ -63,6 +63,16 @@ codex_handoff_template_file = ".kio/codex-handoff.md"
 # slack_bug_repo = "OpenResilienceInitiative/ORISO-Status"
 # KIO_SLACK_BOT_TOKEN is read from the runtime environment.
 
+# Optional bounded bug-repair worker. The shared random machine credential is
+# never stored in TOML. On macOS save it as the generic Keychain item
+# `com.dreambau.kio.repair-worker`; on Linux expose it only through the protected
+# service environment variable KIO_REPAIR_WORKER_TOKEN.
+# repair_api_url = "https://kio.dreambau.com"
+# repair_worker_id = "kio-mac-mini"
+# repair_command = "codex"
+# [repair_repos]
+# "OpenResilienceInitiative/ORISO-Status" = "/Users/kio/Projects/ORISO-Status"
+
 # Leave this empty to run the checked-out source as: python -m gito review ...
 gito_command = ""
 

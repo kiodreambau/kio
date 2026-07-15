@@ -3,17 +3,30 @@
 from __future__ import annotations
 
 from html import escape
+import hmac
 import logging
 from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel
 
 from .config import KioConfig, load_config
 from .run_store import RunSummary, list_runs, state_snapshot
 from .slack_intake import SlackIntakeError, accept_slack_event
 from .webhooks import SignatureError, webhook_work_item, verify_signature
+
+
+class RepairClaimRequest(BaseModel):
+    worker_id: str
+
+
+class RepairCompletionRequest(BaseModel):
+    lease_token: str
+    status: str
+    result_url: str = ""
+    summary: str
 
 
 def create_app(
@@ -99,6 +112,58 @@ def create_app(
         except SlackIntakeError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/repair-jobs/claim")
+    def claim_repair_job(
+        payload: RepairClaimRequest,
+        authorization: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        return {"job": FileRepairQueue(cfg.repair_queue_dir).claim(worker_id=payload.worker_id)}
+
+    @app.post("/api/repair-jobs/{job_id}/complete")
+    def complete_repair_job(
+        job_id: str,
+        payload: RepairCompletionRequest,
+        authorization: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        try:
+            job = FileRepairQueue(cfg.repair_queue_dir).complete(
+                job_id=job_id,
+                lease_token=payload.lease_token,
+                status=payload.status,
+                result_url=payload.result_url,
+                summary=payload.summary,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"job": job}
+
+    @app.get("/api/repair-jobs/{job_id}/artifacts/{artifact_id}")
+    def download_repair_artifact(
+        job_id: str,
+        artifact_id: str,
+        authorization: str = Header(default=""),
+        x_repair_lease: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        try:
+            path, media_type = FileRepairQueue(cfg.repair_queue_dir).artifact(
+                job_id=job_id,
+                artifact_id=artifact_id,
+                lease_token=x_repair_lease,
+                artifact_root=cfg.bug_artifact_dir,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return Response(content=path.read_bytes(), media_type=media_type)
+
     return app
 
 
@@ -138,8 +203,18 @@ def public_config(config: KioConfig) -> dict[str, Any]:
             config.slack_signing_secret and config.slack_bug_channel
         ),
         "slack_bug_delivery_configured": _slack_bug_delivery_configured(config),
+        "repair_worker_api_configured": bool(config.repair_worker_token),
         "github_token_configured": bool(config.github_token),
     }
+
+
+def _require_repair_worker(authorization: str, config: KioConfig) -> None:
+    prefix = "Bearer "
+    supplied = authorization[len(prefix) :] if authorization.startswith(prefix) else ""
+    if not config.repair_worker_token or not hmac.compare_digest(
+        supplied, config.repair_worker_token
+    ):
+        raise HTTPException(status_code=401, detail="repair worker authentication required")
 
 
 def render_dashboard(config: KioConfig, runs: list[RunSummary]) -> str:

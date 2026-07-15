@@ -17,4 +17,9 @@ Git.
 - Normal reports open/link an issue; only an explicit fix trigger queues code.
 - Screenshots use private randomized paths, strict media/size limits and TTL.
 - Kio never force-pushes, auto-merges or promotes to `dev`.
-
+- Repair jobs use a separate bearer-authenticated API and a one-use lease; the
+  server never returns private filesystem paths.
+- An active worker may download only its leased screenshots. They are mode-0600
+  temporary files on Kio's Mac and are removed after the Codex run.
+- Kio's Mac executes repairs only in repositories explicitly mapped by its
+  local TOML. Slack report content is treated as untrusted data.

@@ -186,3 +186,97 @@ def test_slack_bug_delivery_is_queued_only_when_runtime_config_is_complete(tmp_p
 
     assert response.status_code == 200
     processor.assert_called_once_with(cfg, f"C-BUGFIX-{timestamp}.000200")
+
+
+def test_repair_worker_claim_and_completion_require_bearer_auth(tmp_path):
+    from kio.bug_delivery import FileRepairQueue
+
+    cfg = KioConfig(workspace=tmp_path, repair_worker_token="machine-secret")
+    queue = FileRepairQueue(cfg.repair_queue_dir)
+    job_id = queue.queue(
+        intake_id="C-BUGFIX-1.2",
+        repo="owner/repo",
+        issue_number=1,
+        issue_url="https://github.com/owner/repo/issues/1",
+        instructions="Test first.",
+    )
+    client = TestClient(create_app(cfg))
+
+    assert client.post("/api/repair-jobs/claim", json={"worker_id": "mac"}).status_code == 401
+    claim_response = client.post(
+        "/api/repair-jobs/claim",
+        json={"worker_id": "kio-mac-mini"},
+        headers={"Authorization": "Bearer machine-secret"},
+    )
+
+    assert claim_response.status_code == 200
+    claim = claim_response.json()["job"]
+    assert claim["job_id"] == job_id
+    complete_response = client.post(
+        f"/api/repair-jobs/{job_id}/complete",
+        json={
+            "lease_token": claim["lease_token"],
+            "status": "completed",
+            "result_url": "https://github.com/owner/repo/pull/2",
+            "summary": "Ready for human review.",
+        },
+        headers={"Authorization": "Bearer machine-secret"},
+    )
+    assert complete_response.status_code == 200
+    assert complete_response.json()["job"]["status"] == "completed"
+
+
+def test_repair_worker_claim_returns_no_job_without_leaking_server_paths(tmp_path):
+    cfg = KioConfig(workspace=tmp_path, repair_worker_token="machine-secret")
+    response = TestClient(create_app(cfg)).post(
+        "/api/repair-jobs/claim",
+        json={"worker_id": "kio-mac-mini"},
+        headers={"Authorization": "Bearer machine-secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"job": None}
+
+
+def test_repair_worker_can_download_a_private_job_artifact(tmp_path):
+    from kio.bug_delivery import FileRepairQueue
+
+    cfg = KioConfig(workspace=tmp_path, repair_worker_token="machine-secret")
+    artifact_id = "a" * 32
+    artifact_dir = cfg.bug_artifact_dir / "intake"
+    artifact_dir.mkdir(parents=True)
+    artifact_path = artifact_dir / f"{artifact_id}.png"
+    artifact_path.write_bytes(b"\x89PNG\r\n\x1a\nprivate")
+    queue = FileRepairQueue(cfg.repair_queue_dir)
+    job_id = queue.queue(
+        intake_id="C-BUGFIX-1.2",
+        repo="owner/repo",
+        issue_number=1,
+        issue_url="https://github.com/owner/repo/issues/1",
+        instructions="Test first.",
+        artifacts=(
+            {
+                "artifact_id": artifact_id,
+                "media_type": "image/png",
+                "relative_path": f"intake/{artifact_id}.png",
+            },
+        ),
+    )
+    client = TestClient(create_app(cfg))
+    claim = client.post(
+        "/api/repair-jobs/claim",
+        json={"worker_id": "mac"},
+        headers={"Authorization": "Bearer machine-secret"},
+    ).json()["job"]
+
+    response = client.get(
+        f"/api/repair-jobs/{job_id}/artifacts/{artifact_id}",
+        headers={
+            "Authorization": "Bearer machine-secret",
+            "X-Repair-Lease": claim["lease_token"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"\x89PNG\r\n\x1a\nprivate"
+    assert response.headers["content-type"] == "image/png"

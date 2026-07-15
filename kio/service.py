@@ -37,6 +37,28 @@ def render_launch_agent(config: KioConfig, *, config_file: Path | None = None) -
     return plistlib.dumps(plist, sort_keys=True).decode("utf-8")
 
 
+def render_repair_launch_agent(config: KioConfig, *, config_file: Path | None = None) -> str:
+    """Render the separate Mac repair poller without serializing its credential."""
+    log_dir = config.workspace.expanduser() / "logs"
+    args = _kio_program_arguments(["repair-poll"])
+    if config_file:
+        args.extend(["--config", str(config_file.expanduser())])
+    plist = {
+        "Label": f"{config.launch_agent_label}.repair",
+        "ProgramArguments": args,
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "WorkingDirectory": str(Path.cwd()),
+        "EnvironmentVariables": {
+            "PATH": _service_path(),
+            "KIO_WORKSPACE": str(config.workspace.expanduser()),
+        },
+        "StandardOutPath": str(log_dir / "repair-agent.out.log"),
+        "StandardErrorPath": str(log_dir / "repair-agent.err.log"),
+    }
+    return plistlib.dumps(plist, sort_keys=True).decode("utf-8")
+
+
 def write_launch_agent(
     config: KioConfig,
     *,
@@ -58,7 +80,12 @@ def _program_arguments(config: KioConfig) -> list[str]:
         "--port",
         str(config.dashboard_port),
     ]
-    if config.launch_agent_runner == "uv" and (uv := shutil.which("uv")):
+    return _kio_program_arguments(serve_args, config=config)
+
+
+def _kio_program_arguments(args: list[str], *, config: KioConfig | None = None) -> list[str]:
+    runner = config.launch_agent_runner if config else "uv"
+    if runner == "uv" and (uv := shutil.which("uv")):
         return [
             uv,
             "run",
@@ -68,9 +95,9 @@ def _program_arguments(config: KioConfig) -> list[str]:
             "python",
             "-m",
             "kio",
-            *serve_args,
+            *args,
         ]
-    return [sys.executable, "-m", "kio", *serve_args]
+    return [sys.executable, "-m", "kio", *args]
 
 
 def _service_path() -> str:
