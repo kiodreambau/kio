@@ -40,7 +40,7 @@ def render_launch_agent(config: KioConfig, *, config_file: Path | None = None) -
 def render_repair_launch_agent(config: KioConfig, *, config_file: Path | None = None) -> str:
     """Render the separate Mac repair poller without serializing its credential."""
     log_dir = config.workspace.expanduser() / "logs"
-    args = _kio_program_arguments(["repair-poll"])
+    args = _kio_program_arguments(["repair-poll"], config=config)
     if config_file:
         args.extend(["--config", str(config_file.expanduser())])
     plist = {
@@ -85,7 +85,9 @@ def _program_arguments(config: KioConfig) -> list[str]:
 
 def _kio_program_arguments(args: list[str], *, config: KioConfig | None = None) -> list[str]:
     runner = config.launch_agent_runner if config else "uv"
-    if runner == "uv" and (uv := shutil.which("uv")):
+    home_uv = Path.home() / ".local" / "bin" / "uv"
+    uv = shutil.which("uv") or (str(home_uv) if home_uv.exists() else None)
+    if runner == "uv" and uv:
         return [
             uv,
             "run",

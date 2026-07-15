@@ -72,3 +72,18 @@ def test_render_repair_launch_agent_polls_without_embedding_machine_token(tmp_pa
     assert plist["KeepAlive"] is True
     assert "KIO_REPAIR_WORKER_TOKEN" not in plist["EnvironmentVariables"]
     assert "must-not-be-in-plist" not in str(plist)
+
+
+def test_repair_launch_agent_uses_home_uv_when_launch_environment_path_is_minimal(
+    tmp_path, monkeypatch
+):
+    home = tmp_path / "home"
+    uv = home / ".local" / "bin" / "uv"
+    uv.parent.mkdir(parents=True)
+    uv.touch()
+    monkeypatch.setattr("kio.service.Path.home", lambda: home)
+    monkeypatch.setattr("kio.service.shutil.which", lambda name: None)
+
+    plist = plistlib.loads(render_repair_launch_agent(KioConfig()).encode("utf-8"))
+
+    assert plist["ProgramArguments"][0] == str(uv)
