@@ -65,7 +65,7 @@ def run_repair_once(
     runner: Callable[..., Any] = subprocess.run,
 ) -> bool:
     """Claim at most one repair and run Codex inside an explicit repo mapping."""
-    token = config.repair_worker_token or _keychain_worker_token()
+    token = _runtime_worker_token(config)
     client = api or RepairApiClient(
         base_url=config.repair_api_url,
         token=token,
@@ -175,8 +175,10 @@ def poll_repairs_forever(config: KioConfig) -> None:
         time.sleep(config.poll_interval_seconds)
 
 
-def _keychain_worker_token() -> str:
-    completed = subprocess.run(
+def _runtime_worker_token(config: KioConfig, *, runner: Callable[..., Any] = subprocess.run) -> str:
+    if config.repair_worker_token:
+        return config.repair_worker_token
+    completed = runner(
         [
             "/usr/bin/security",
             "find-generic-password",
@@ -189,9 +191,16 @@ def _keychain_worker_token() -> str:
         shell=False,
         timeout=10,
     )
-    if completed.returncode != 0 or not completed.stdout.strip():
-        raise RuntimeError("Kio repair worker token is missing from the macOS Keychain")
-    return completed.stdout.strip()
+    if completed.returncode == 0 and completed.stdout.strip():
+        return completed.stdout.strip()
+    token_path = Path.home() / ".config" / "kio" / "repair-worker.token"
+    if token_path.exists():
+        if token_path.stat().st_mode & 0o777 != 0o600:
+            raise RuntimeError("Kio headless worker token must have mode 0600")
+        token = token_path.read_text(encoding="utf-8").strip()
+        if token:
+            return token
+    raise RuntimeError("Kio repair worker token is missing from Keychain and private token file")
 
 
 def _repair_prompt(job: dict[str, Any]) -> str:

@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from kio.config import KioConfig
-from kio.repair_worker import run_repair_once
+from kio.repair_worker import _runtime_worker_token, run_repair_once
 
 
 def test_worker_runs_codex_only_in_the_allowlisted_repo_and_reports_pr(tmp_path):
@@ -95,3 +95,31 @@ def test_worker_is_idle_when_the_server_has_no_job(tmp_path):
     api.claim.return_value = None
 
     assert run_repair_once(cfg, api=api, runner=Mock()) is False
+
+
+def test_worker_uses_a_private_headless_token_file_when_keychain_is_unavailable(
+    tmp_path, monkeypatch
+):
+    token_path = tmp_path / ".config" / "kio" / "repair-worker.token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("headless-machine-secret\n", encoding="utf-8")
+    token_path.chmod(0o600)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    keychain = Mock(returncode=44, stdout="")
+
+    assert _runtime_worker_token(KioConfig(), runner=keychain) == "headless-machine-secret"
+
+
+def test_worker_rejects_a_headless_token_file_with_group_permissions(tmp_path, monkeypatch):
+    token_path = tmp_path / ".config" / "kio" / "repair-worker.token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("unsafe\n", encoding="utf-8")
+    token_path.chmod(0o640)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+    try:
+        _runtime_worker_token(KioConfig(), runner=Mock(returncode=44, stdout=""))
+    except RuntimeError as exc:
+        assert "must have mode 0600" in str(exc)
+    else:
+        raise AssertionError("group-readable machine token must be rejected")

@@ -66,7 +66,9 @@ codex_handoff_template_file = ".kio/codex-handoff.md"
 # Optional bounded bug-repair worker. The shared random machine credential is
 # never stored in TOML. On macOS save it as the generic Keychain item
 # `com.dreambau.kio.repair-worker`; on Linux expose it only through the protected
-# service environment variable KIO_REPAIR_WORKER_TOKEN.
+# service environment variable KIO_REPAIR_WORKER_TOKEN. A headless Mac may use
+# the mode-0600 file ~/.config/kio/repair-worker.token when Keychain bootstrap
+# cannot be approved interactively.
 # repair_api_url = "https://kio.dreambau.com"
 # repair_worker_id = "kio-mac-mini"
 # repair_command = "codex"
