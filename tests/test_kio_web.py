@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import time
+from dataclasses import replace
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
@@ -161,6 +162,46 @@ def test_bug_intake_status_endpoint_is_read_only_and_aggregate(tmp_path):
         "issues_created": 0,
     }
     assert "secret report" not in response.text
+
+
+def test_health_endpoints_separate_process_liveness_from_complete_bug_delivery(tmp_path):
+    incomplete = TestClient(create_app(KioConfig(workspace=tmp_path)))
+
+    live = incomplete.get("/health/live")
+    unavailable = incomplete.get("/health/ready")
+
+    assert live.status_code == 200
+    assert live.json() == {"status": "ok"}
+    assert unavailable.status_code == 503
+    assert unavailable.json() == {"status": "unavailable"}
+
+    complete_config = KioConfig(
+        workspace=tmp_path,
+        github_token="github-token",
+        slack_signing_secret="signing-secret",
+        slack_bot_token="bot-token",
+        slack_bot_user_id="U-KIO",
+        slack_bug_channel="C-BUGFIX",
+        slack_bug_repo="OpenResilienceInitiative/ORISO-Status",
+        repair_worker_token="repair-token",
+    )
+
+    assert (
+        TestClient(create_app(replace(complete_config, slack_bot_user_id="")))
+        .get("/health/ready")
+        .status_code
+        == 503
+    )
+    assert (
+        TestClient(create_app(replace(complete_config, repair_worker_token="")))
+        .get("/health/ready")
+        .status_code
+        == 503
+    )
+    ready = TestClient(create_app(complete_config)).get("/health/ready")
+
+    assert ready.status_code == 200
+    assert ready.json() == {"status": "ready"}
 
 
 def test_slack_bug_delivery_is_queued_only_when_runtime_config_is_complete(tmp_path):

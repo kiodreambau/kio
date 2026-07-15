@@ -10,7 +10,7 @@ import time
 from typing import Any, Callable
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from .config import KioConfig, load_config
@@ -59,6 +59,16 @@ def create_app(
     @app.get("/api/bug-intake/status")
     def api_bug_intake_status():
         return bug_intake_status(cfg)
+
+    @app.get("/health/live")
+    def health_live():
+        return {"status": "ok"}
+
+    @app.get("/health/ready")
+    def health_ready():
+        if not (_slack_bug_delivery_configured(cfg) and cfg.repair_worker_token):
+            return JSONResponse(status_code=503, content={"status": "unavailable"})
+        return {"status": "ready"}
 
     @app.post("/webhooks/github")
     async def github_webhook(
@@ -385,6 +395,7 @@ def _slack_bug_delivery_configured(config: KioConfig) -> bool:
         config.github_token
         and config.slack_signing_secret
         and config.slack_bot_token
+        and config.slack_bot_user_id
         and config.slack_bug_channel
         and config.slack_bug_repo
     )
