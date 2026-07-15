@@ -6,6 +6,7 @@ from html import escape
 import hmac
 import logging
 from pathlib import Path
+import time
 from typing import Any, Callable
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
@@ -13,6 +14,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from .config import KioConfig, load_config
+from .operating_status import bug_intake_status
 from .run_store import RunSummary, list_runs, state_snapshot
 from .slack_intake import SlackIntakeError, accept_slack_event
 from .webhooks import SignatureError, webhook_work_item, verify_signature
@@ -53,6 +55,10 @@ def create_app(
     @app.get("/api/state")
     def api_state():
         return {"state": state_snapshot(cfg)}
+
+    @app.get("/api/bug-intake/status")
+    def api_bug_intake_status():
+        return bug_intake_status(cfg)
 
     @app.post("/webhooks/github")
     async def github_webhook(
@@ -385,6 +391,7 @@ def _slack_bug_delivery_configured(config: KioConfig) -> bool:
 
 
 def _process_slack_bug_item(config: KioConfig, intake_id: str) -> None:
+    record_path = config.slack_intake_dir / f"{intake_id}.json"
     try:
         from .bug_clients import GithubIssueClient, SlackApiClient
         from .bug_delivery import FileRepairQueue
@@ -392,14 +399,23 @@ def _process_slack_bug_item(config: KioConfig, intake_id: str) -> None:
 
         slack = SlackApiClient(config.slack_bot_token)
         process_slack_bug(
-            record_path=config.slack_intake_dir / f"{intake_id}.json",
+            record_path=record_path,
             artifact_root=config.bug_artifact_dir,
             repo=config.slack_bug_repo,
             slack=slack,
             github=GithubIssueClient(config.github_token),
             repair=FileRepairQueue(config.repair_queue_dir),
         )
+        from .operating_status import record_delivery_state
+
+        record_delivery_state(record_path, state="delivered", now=int(time.time()))
     except Exception:
+        try:
+            from .operating_status import record_delivery_state
+
+            record_delivery_state(record_path, state="blocked", now=int(time.time()))
+        except Exception:
+            logging.exception("Could not persist blocked bug intake state for %s", intake_id)
         logging.exception("Slack bug intake processing failed for %s", intake_id)
 
 

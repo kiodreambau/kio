@@ -144,6 +144,25 @@ def test_slack_events_endpoint_completes_signed_url_verification(tmp_path):
     assert response.json() == {"challenge": "safe-challenge"}
 
 
+def test_bug_intake_status_endpoint_is_read_only_and_aggregate(tmp_path):
+    cfg = KioConfig(workspace=tmp_path)
+    cfg.slack_intake_dir.mkdir(parents=True)
+    (cfg.slack_intake_dir / "report.json").write_text(
+        json.dumps({"text": "secret report", "delivery_state": "blocked"}),
+        encoding="utf-8",
+    )
+
+    response = TestClient(create_app(cfg)).get("/api/bug-intake/status")
+
+    assert response.status_code == 200
+    assert response.json()["intakes"] == {
+        "total": 1,
+        "blocked": 1,
+        "issues_created": 0,
+    }
+    assert "secret report" not in response.text
+
+
 def test_slack_bug_delivery_is_queued_only_when_runtime_config_is_complete(tmp_path):
     secret = "runtime-signing-secret"
     timestamp = str(int(time.time()))
