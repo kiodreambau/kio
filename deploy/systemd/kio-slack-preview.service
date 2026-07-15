@@ -1,0 +1,20 @@
+[Unit]
+Description=kio Slack bug intake preview
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kio
+Group=kio
+WorkingDirectory=/opt/kio-slack-preview
+Environment=PATH=/home/kio/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/kio/kio.env
+ExecStart=/home/kio/.local/bin/uv run --python 3.12 --no-project --with-editable /opt/kio-slack-preview python -m kio serve --host 10.42.0.1 --port 8766 --config /etc/kio/config.toml
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/kio/kio-slack-preview.out.log
+StandardError=append:/var/log/kio/kio-slack-preview.err.log
+
+[Install]
+WantedBy=multi-user.target
