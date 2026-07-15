@@ -56,6 +56,12 @@ codex_handoff_template_file = ".kio/codex-handoff.md"
 # smtp_security = "starttls" # starttls, ssl, or none
 # KIO_SMTP_USERNAME and KIO_SMTP_PASSWORD are read from the environment.
 # KIO_SLACK_WEBHOOK_URL is optional and sends an outbound completion notification only.
+# Slack bug intake uses a non-secret channel id here and the signing secret only
+# from the runtime environment variable KIO_SLACK_SIGNING_SECRET.
+# slack_bug_channel = "C0123456789"
+# slack_bot_user_id = "U0123456789"
+# slack_bug_repo = "OpenResilienceInitiative/ORISO-Status"
+# KIO_SLACK_BOT_TOKEN is read from the runtime environment.
 
 # Leave this empty to run the checked-out source as: python -m gito review ...
 gito_command = ""

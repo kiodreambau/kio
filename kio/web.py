@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 from html import escape
+import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .config import KioConfig, load_config
 from .run_store import RunSummary, list_runs, state_snapshot
+from .slack_intake import SlackIntakeError, accept_slack_event
 from .webhooks import SignatureError, webhook_work_item, verify_signature
 
 
-def create_app(config: KioConfig | None = None):
+def create_app(
+    config: KioConfig | None = None,
+    *,
+    slack_processor: Callable[[KioConfig, str], None] | None = None,
+):
     cfg = config or load_config()
+    process_slack = slack_processor or _process_slack_bug_item
     app = FastAPI(title="kio", version="0.1.0")
 
     @app.get("/", response_class=HTMLResponse)
@@ -64,6 +71,34 @@ def create_app(config: KioConfig | None = None):
         background_tasks.add_task(_process_webhook_item, cfg, item, cfg.webhook_dry_run)
         return {"accepted": True, "dedupe_key": item.dedupe_key, "mode": item.mode}
 
+    @app.post("/webhooks/slack")
+    async def slack_webhook(
+        request: Request,
+        background_tasks: BackgroundTasks,
+        x_slack_request_timestamp: str = Header(default=""),
+        x_slack_signature: str = Header(default=""),
+    ):
+        body = await request.body()
+        try:
+            result = accept_slack_event(
+                raw_body=body,
+                timestamp=x_slack_request_timestamp,
+                signature=x_slack_signature,
+                signing_secret=cfg.slack_signing_secret,
+                allowed_channel=cfg.slack_bug_channel,
+                bot_user_id=cfg.slack_bot_user_id,
+                state_root=cfg.slack_intake_dir,
+            )
+            if (
+                result.get("accepted")
+                and not result.get("duplicate")
+                and _slack_bug_delivery_configured(cfg)
+            ):
+                background_tasks.add_task(process_slack, cfg, str(result["intake_id"]))
+            return result
+        except SlackIntakeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     return app
 
 
@@ -99,6 +134,10 @@ def public_config(config: KioConfig) -> dict[str, Any]:
             and config.smtp_password
         ),
         "slack_notifications_configured": bool(config.slack_webhook_url),
+        "slack_bug_intake_configured": bool(
+            config.slack_signing_secret and config.slack_bug_channel
+        ),
+        "slack_bug_delivery_configured": _slack_bug_delivery_configured(config),
         "github_token_configured": bool(config.github_token),
     }
 
@@ -258,6 +297,35 @@ def _process_webhook_item(config: KioConfig, item, dry_run: bool) -> None:
     from .worker import KioWorker
 
     KioWorker(config).process_item(item, dry_run=dry_run)
+
+
+def _slack_bug_delivery_configured(config: KioConfig) -> bool:
+    return bool(
+        config.github_token
+        and config.slack_signing_secret
+        and config.slack_bot_token
+        and config.slack_bug_channel
+        and config.slack_bug_repo
+    )
+
+
+def _process_slack_bug_item(config: KioConfig, intake_id: str) -> None:
+    try:
+        from .bug_clients import GithubIssueClient, SlackApiClient
+        from .bug_delivery import FileRepairQueue
+        from .bug_intake_service import process_slack_bug
+
+        slack = SlackApiClient(config.slack_bot_token)
+        process_slack_bug(
+            record_path=config.slack_intake_dir / f"{intake_id}.json",
+            artifact_root=config.bug_artifact_dir,
+            repo=config.slack_bug_repo,
+            slack=slack,
+            github=GithubIssueClient(config.github_token),
+            repair=FileRepairQueue(config.repair_queue_dir),
+        )
+    except Exception:
+        logging.exception("Slack bug intake processing failed for %s", intake_id)
 
 
 def _css() -> str:
