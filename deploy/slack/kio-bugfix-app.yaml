@@ -1,0 +1,28 @@
+_metadata:
+  major_version: 2
+
+display_information:
+  name: Kio Bugfix
+  description: Turns explicit ORISO bug reports into auditable, human-reviewed repair runs.
+  background_color: "#0f766e"
+
+features:
+  bot_user:
+    display_name: Kio Bugfix
+    always_online: false
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - chat:write
+      - files:read
+
+settings:
+  event_subscriptions:
+    request_url: https://kio.dreambau.com/webhooks/slack
+    bot_events:
+      - message.channels
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
