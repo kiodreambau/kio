@@ -10,7 +10,7 @@ Group=kio
 WorkingDirectory=/opt/kio-slack-preview
 Environment=PATH=/home/kio/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=/etc/kio/kio.env
-ExecStart=/home/kio/.local/bin/uv run --python 3.12 --no-project --with-editable /opt/kio-slack-preview python -m kio serve --host 10.42.0.1 --port 8766 --config /etc/kio/config.toml
+ExecStart=/home/kio/.local/bin/uv run --python 3.12 --no-project --with-editable /opt/kio-slack-preview python -m kio serve --host 10.42.0.1 --port 8876 --config /etc/kio/config.toml
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/kio/kio-slack-preview.out.log
