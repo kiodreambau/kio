@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kio-slack
+  namespace: wcr
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8876
+      targetPort: 8876
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kio-slack
+  namespace: wcr
+  labels:
+    kubernetes.io/service-name: kio-slack
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 8876
+endpoints:
+  - addresses:
+      - 10.42.0.1
+    conditions:
+      ready: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kio-slack
+  namespace: wcr
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - kio.dreambau.com
+      secretName: kio-dreambau-tls
+  rules:
+    - host: kio.dreambau.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kio-slack
+                port:
+                  number: 8876

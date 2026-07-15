@@ -59,6 +59,16 @@ class KioConfig:
     smtp_username: str = ""
     smtp_password: str = ""
     slack_webhook_url: str = ""
+    slack_signing_secret: str = ""
+    slack_bot_token: str = ""
+    slack_bot_user_id: str = ""
+    slack_bug_channel: str = ""
+    slack_bug_repo: str = ""
+    repair_worker_token: str = ""
+    repair_api_url: str = ""
+    repair_worker_id: str = "kio-mac-mini"
+    repair_repos: dict[str, str] = field(default_factory=dict)
+    repair_command: str = "codex"
 
     @property
     def runs_dir(self) -> Path:
@@ -71,6 +81,18 @@ class KioConfig:
     @property
     def state_file(self) -> Path:
         return self.state_dir / "reviews.json"
+
+    @property
+    def slack_intake_dir(self) -> Path:
+        return self.workspace.expanduser() / "slack-intake"
+
+    @property
+    def bug_artifact_dir(self) -> Path:
+        return self.workspace.expanduser() / "bug-artifacts"
+
+    @property
+    def repair_queue_dir(self) -> Path:
+        return self.workspace.expanduser() / "repair-queue"
 
     def validate(self) -> None:
         if self.backend not in SUPPORTED_BACKENDS:
@@ -164,6 +186,18 @@ def load_config(config_file: Path | None = None) -> KioConfig:
         smtp_username=os.getenv("KIO_SMTP_USERNAME", ""),
         smtp_password=os.getenv("KIO_SMTP_PASSWORD", ""),
         slack_webhook_url=os.getenv("KIO_SLACK_WEBHOOK_URL", ""),
+        slack_signing_secret=os.getenv("KIO_SLACK_SIGNING_SECRET", ""),
+        slack_bot_token=os.getenv("KIO_SLACK_BOT_TOKEN", ""),
+        slack_bot_user_id=str(data.get("slack_bot_user_id", "")),
+        slack_bug_channel=str(data.get("slack_bug_channel", "")),
+        slack_bug_repo=str(data.get("slack_bug_repo", "")),
+        repair_worker_token=os.getenv("KIO_REPAIR_WORKER_TOKEN", ""),
+        repair_api_url=str(data.get("repair_api_url", "")),
+        repair_worker_id=str(data.get("repair_worker_id", KioConfig.repair_worker_id)),
+        repair_repos={
+            str(repo): str(path) for repo, path in dict(data.get("repair_repos", {})).items()
+        },
+        repair_command=str(data.get("repair_command", KioConfig.repair_command)),
     )
     cfg.validate()
     return cfg
@@ -222,6 +256,9 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "KIO_SMTP_HOST": "smtp_host",
         "KIO_SMTP_PORT": "smtp_port",
         "KIO_SMTP_SECURITY": "smtp_security",
+        "KIO_SLACK_BUG_CHANNEL": "slack_bug_channel",
+        "KIO_SLACK_BOT_USER_ID": "slack_bot_user_id",
+        "KIO_SLACK_BUG_REPO": "slack_bug_repo",
         "GITHUB_TOKEN": "github_token",
         "GH_TOKEN": "github_token",
     }

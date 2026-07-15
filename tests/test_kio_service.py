@@ -1,7 +1,12 @@
 import plistlib
 
 from kio.config import KioConfig
-from kio.service import default_launch_agent_path, render_launch_agent, write_launch_agent
+from kio.service import (
+    default_launch_agent_path,
+    render_launch_agent,
+    render_repair_launch_agent,
+    write_launch_agent,
+)
 
 
 def test_render_launch_agent_contains_self_host_command(tmp_path, monkeypatch):
@@ -49,3 +54,36 @@ def test_default_launch_agent_path_uses_label():
     cfg = KioConfig(launch_agent_label="io.kio.test")
 
     assert default_launch_agent_path(cfg).name == "io.kio.test.plist"
+
+
+def test_render_repair_launch_agent_polls_without_embedding_machine_token(tmp_path, monkeypatch):
+    monkeypatch.setattr("kio.service.shutil.which", lambda name: "/Users/kio/.local/bin/uv")
+    cfg = KioConfig(
+        workspace=tmp_path,
+        launch_agent_label="io.kio.worker",
+        repair_api_url="https://kio.dreambau.com",
+        repair_worker_token="must-not-be-in-plist",
+    )
+
+    plist = plistlib.loads(render_repair_launch_agent(cfg).encode("utf-8"))
+
+    assert plist["Label"] == "io.kio.worker.repair"
+    assert plist["ProgramArguments"][-1] == "repair-poll"
+    assert plist["KeepAlive"] is True
+    assert "KIO_REPAIR_WORKER_TOKEN" not in plist["EnvironmentVariables"]
+    assert "must-not-be-in-plist" not in str(plist)
+
+
+def test_repair_launch_agent_uses_home_uv_when_launch_environment_path_is_minimal(
+    tmp_path, monkeypatch
+):
+    home = tmp_path / "home"
+    uv = home / ".local" / "bin" / "uv"
+    uv.parent.mkdir(parents=True)
+    uv.touch()
+    monkeypatch.setattr("kio.service.Path.home", lambda: home)
+    monkeypatch.setattr("kio.service.shutil.which", lambda name: None)
+
+    plist = plistlib.loads(render_repair_launch_agent(KioConfig()).encode("utf-8"))
+
+    assert plist["ProgramArguments"][0] == str(uv)

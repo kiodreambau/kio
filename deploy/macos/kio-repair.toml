@@ -1,0 +1,12 @@
+# Kio Mac Mini deployment routing. Secrets are loaded from Keychain or the
+# private ~/.config/kio/repair-worker.token file, never from this file.
+workspace = "/Users/kio/.local/share/kio"
+poll_interval_seconds = 30
+launch_agent_label = "com.dreambau.kio"
+launch_agent_runner = "uv"
+repair_api_url = "https://kio.dreambau.com"
+repair_worker_id = "kio-mac-mini"
+repair_command = "/Users/kio/.local/bin/codex"
+
+[repair_repos]
+"OpenResilienceInitiative/ORISO-Status" = "/Users/kio/Documents/GitHub/ORISO"

@@ -3,19 +3,41 @@
 from __future__ import annotations
 
 from html import escape
+import hmac
+import logging
 from pathlib import Path
-from typing import Any
+import time
+from typing import Any, Callable
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from pydantic import BaseModel
 
 from .config import KioConfig, load_config
+from .operating_status import bug_intake_status
 from .run_store import RunSummary, list_runs, state_snapshot
+from .slack_intake import SlackIntakeError, accept_slack_event
 from .webhooks import SignatureError, webhook_work_item, verify_signature
 
 
-def create_app(config: KioConfig | None = None):
+class RepairClaimRequest(BaseModel):
+    worker_id: str
+
+
+class RepairCompletionRequest(BaseModel):
+    lease_token: str
+    status: str
+    result_url: str = ""
+    summary: str
+
+
+def create_app(
+    config: KioConfig | None = None,
+    *,
+    slack_processor: Callable[[KioConfig, str], None] | None = None,
+):
     cfg = config or load_config()
+    process_slack = slack_processor or _process_slack_bug_item
     app = FastAPI(title="kio", version="0.1.0")
 
     @app.get("/", response_class=HTMLResponse)
@@ -33,6 +55,20 @@ def create_app(config: KioConfig | None = None):
     @app.get("/api/state")
     def api_state():
         return {"state": state_snapshot(cfg)}
+
+    @app.get("/api/bug-intake/status")
+    def api_bug_intake_status():
+        return bug_intake_status(cfg)
+
+    @app.get("/health/live")
+    def health_live():
+        return {"status": "ok"}
+
+    @app.get("/health/ready")
+    def health_ready():
+        if not (_slack_bug_delivery_configured(cfg) and cfg.repair_worker_token):
+            return JSONResponse(status_code=503, content={"status": "unavailable"})
+        return {"status": "ready"}
 
     @app.post("/webhooks/github")
     async def github_webhook(
@@ -63,6 +99,86 @@ def create_app(config: KioConfig | None = None):
             return {"accepted": False, "reason": "no kio trigger"}
         background_tasks.add_task(_process_webhook_item, cfg, item, cfg.webhook_dry_run)
         return {"accepted": True, "dedupe_key": item.dedupe_key, "mode": item.mode}
+
+    @app.post("/webhooks/slack")
+    async def slack_webhook(
+        request: Request,
+        background_tasks: BackgroundTasks,
+        x_slack_request_timestamp: str = Header(default=""),
+        x_slack_signature: str = Header(default=""),
+    ):
+        body = await request.body()
+        try:
+            result = accept_slack_event(
+                raw_body=body,
+                timestamp=x_slack_request_timestamp,
+                signature=x_slack_signature,
+                signing_secret=cfg.slack_signing_secret,
+                allowed_channel=cfg.slack_bug_channel,
+                bot_user_id=cfg.slack_bot_user_id,
+                state_root=cfg.slack_intake_dir,
+            )
+            if (
+                result.get("accepted")
+                and not result.get("duplicate")
+                and _slack_bug_delivery_configured(cfg)
+            ):
+                background_tasks.add_task(process_slack, cfg, str(result["intake_id"]))
+            return result
+        except SlackIntakeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/repair-jobs/claim")
+    def claim_repair_job(
+        payload: RepairClaimRequest,
+        authorization: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        return {"job": FileRepairQueue(cfg.repair_queue_dir).claim(worker_id=payload.worker_id)}
+
+    @app.post("/api/repair-jobs/{job_id}/complete")
+    def complete_repair_job(
+        job_id: str,
+        payload: RepairCompletionRequest,
+        authorization: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        try:
+            job = FileRepairQueue(cfg.repair_queue_dir).complete(
+                job_id=job_id,
+                lease_token=payload.lease_token,
+                status=payload.status,
+                result_url=payload.result_url,
+                summary=payload.summary,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"job": job}
+
+    @app.get("/api/repair-jobs/{job_id}/artifacts/{artifact_id}")
+    def download_repair_artifact(
+        job_id: str,
+        artifact_id: str,
+        authorization: str = Header(default=""),
+        x_repair_lease: str = Header(default=""),
+    ):
+        _require_repair_worker(authorization, cfg)
+        from .bug_delivery import FileRepairQueue
+
+        try:
+            path, media_type = FileRepairQueue(cfg.repair_queue_dir).artifact(
+                job_id=job_id,
+                artifact_id=artifact_id,
+                lease_token=x_repair_lease,
+                artifact_root=cfg.bug_artifact_dir,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return Response(content=path.read_bytes(), media_type=media_type)
 
     return app
 
@@ -99,8 +215,22 @@ def public_config(config: KioConfig) -> dict[str, Any]:
             and config.smtp_password
         ),
         "slack_notifications_configured": bool(config.slack_webhook_url),
+        "slack_bug_intake_configured": bool(
+            config.slack_signing_secret and config.slack_bug_channel
+        ),
+        "slack_bug_delivery_configured": _slack_bug_delivery_configured(config),
+        "repair_worker_api_configured": bool(config.repair_worker_token),
         "github_token_configured": bool(config.github_token),
     }
+
+
+def _require_repair_worker(authorization: str, config: KioConfig) -> None:
+    prefix = "Bearer "
+    supplied = authorization[len(prefix) :] if authorization.startswith(prefix) else ""
+    if not config.repair_worker_token or not hmac.compare_digest(
+        supplied, config.repair_worker_token
+    ):
+        raise HTTPException(status_code=401, detail="repair worker authentication required")
 
 
 def render_dashboard(config: KioConfig, runs: list[RunSummary]) -> str:
@@ -258,6 +388,46 @@ def _process_webhook_item(config: KioConfig, item, dry_run: bool) -> None:
     from .worker import KioWorker
 
     KioWorker(config).process_item(item, dry_run=dry_run)
+
+
+def _slack_bug_delivery_configured(config: KioConfig) -> bool:
+    return bool(
+        config.github_token
+        and config.slack_signing_secret
+        and config.slack_bot_token
+        and config.slack_bot_user_id
+        and config.slack_bug_channel
+        and config.slack_bug_repo
+    )
+
+
+def _process_slack_bug_item(config: KioConfig, intake_id: str) -> None:
+    record_path = config.slack_intake_dir / f"{intake_id}.json"
+    try:
+        from .bug_clients import GithubIssueClient, SlackApiClient
+        from .bug_delivery import FileRepairQueue
+        from .bug_intake_service import process_slack_bug
+
+        slack = SlackApiClient(config.slack_bot_token)
+        process_slack_bug(
+            record_path=record_path,
+            artifact_root=config.bug_artifact_dir,
+            repo=config.slack_bug_repo,
+            slack=slack,
+            github=GithubIssueClient(config.github_token),
+            repair=FileRepairQueue(config.repair_queue_dir),
+        )
+        from .operating_status import record_delivery_state
+
+        record_delivery_state(record_path, state="delivered", now=int(time.time()))
+    except Exception:
+        try:
+            from .operating_status import record_delivery_state
+
+            record_delivery_state(record_path, state="blocked", now=int(time.time()))
+        except Exception:
+            logging.exception("Could not persist blocked bug intake state for %s", intake_id)
+        logging.exception("Slack bug intake processing failed for %s", intake_id)
 
 
 def _css() -> str:

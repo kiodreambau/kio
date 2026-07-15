@@ -160,5 +160,32 @@ def launch_agent(
     typer.echo(str(path))
 
 
+@app.command("repair-once")
+def repair_once(
+    config_file: Annotated[
+        Path | None,
+        typer.Option("--config", "-c", help="Additional kio TOML config file"),
+    ] = None,
+):
+    """Claim and process at most one human-gated repair job."""
+    from .repair_worker import run_repair_once
+
+    processed = run_repair_once(load_config(config_file))
+    typer.echo("kio repair processed." if processed else "kio repair queue is empty.")
+
+
+@app.command("repair-poll")
+def repair_poll(
+    config_file: Annotated[
+        Path | None,
+        typer.Option("--config", "-c", help="Additional kio TOML config file"),
+    ] = None,
+):
+    """Continuously process human-gated repairs on this Mac."""
+    from .repair_worker import poll_repairs_forever
+
+    poll_repairs_forever(load_config(config_file))
+
+
 def main():
     app()
