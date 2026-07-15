@@ -132,6 +132,7 @@ def run_repair_once(
             'approval_policy="never"',
             "-s",
             "workspace-write",
+            "--skip-git-repo-check",
             "-C",
             str(repo_path),
             *image_args,

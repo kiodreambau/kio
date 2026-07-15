@@ -42,6 +42,7 @@ def test_worker_runs_codex_only_in_the_allowlisted_repo_and_reports_pr(tmp_path)
     assert processed is True
     args = runner.call_args.args[0]
     assert args[:2] == ["codex", "exec"]
+    assert "--skip-git-repo-check" in args
     assert "-i" in args
     assert args[-1] == "-"
     assert runner.call_args.kwargs["cwd"] == repo_path.resolve()
